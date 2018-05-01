@@ -8,17 +8,18 @@ class RingBuffer
     @store = StaticArray.new(8)
     @length = 0
     @capacity = 8
+    @start_idx = 0
   end
 
   # O(1)
   def [](index)
     check_index(index)
-    @store[index]
+    @store[(index + @start_idx) % @capacity]
   end
 
   # O(1)
   def []=(index, val)
-    @store[index] = val
+    @store[(index + @start_idx) % @capacity] = val
   end
 
   # O(1)
@@ -26,8 +27,7 @@ class RingBuffer
     if @length <= 0
       raise "index out of bounds"
     end
-    res = @store[@length - 1]
-    @store = @store[0...-1]
+    res = @store[(@start_idx + @length - 1) % @capacity]
     @length -= 1
     res
   end
@@ -37,9 +37,8 @@ class RingBuffer
     if @length == @capacity
       self.resize!
     end
-    @store[self.length] = val
+    @store[(@start_idx + @length) % @capacity] = val
     @length += 1
-    @store[0..@length - 1]
   end
 
   # O(1)
@@ -47,19 +46,28 @@ class RingBuffer
     if @length <= 0
       raise "index out of bounds"
     end
-    res = @store[0]
+    res = @store[@start_idx]
     @length -= 1
-    @store = @store[1..@length]
+    @store[@start_idx] = nil
+    @start_idx = (@start_idx + 1) % @capacity
     res
   end
 
   # O(1) ammortized
   def unshift(val)
-    new_arr = StaticArray.new(8)
-    new_arr[0] = val
-    new_arr[1..@length] = @store[0..@length - 1]
+    if @length == @capacity
+      self.resize!
+    end
+    if @length == 0
+      @start_idx = 0
+    elsif @start_idx >= 1
+      @start_idx -= 1
+    else
+      @start_idx = @capacity - 1
+    end
+    @store[@start_idx] = val
     @length += 1
-    @store = new_arr
+    @store
   end
 
   protected
@@ -73,9 +81,11 @@ class RingBuffer
   end
 
   def resize!
-    new_store = StaticArray.new(16)
-    @capacity = 16
-    new_store[0..7] = @store[0..7]
+    @capacity += 8
+    new_store = StaticArray.new(@capacity)
+    new_store[0...@start_idx] = @store[0...@start_idx]
+    new_store[(@start_idx + 8)...@capacity] = @store[@start_idx...@length]
+    @start_idx += 8
     @store = new_store
   end
 end
